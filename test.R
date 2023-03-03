@@ -3,16 +3,18 @@ devtools::load_all()
 
 true_theta <- c(0, 1)
 data <- rnorm(100, true_theta[1], true_theta[2])
-ll <- function(theta, data){
+ll <- function(theta, data, block){
   sum(dnorm(data, theta[1], theta[2], log = TRUE))
 }
 lp <- function(theta){
   return(0)
 }
 theta <- c(0.5, 2)
+blocks <- c(1L, 1L)
+n_unique_blocks = length(unique(blocks))
 
 system.time({
-  o1 <- mcmc(theta, c(0L, 2L),  c(-Inf, 0),  c(Inf, Inf), data, 10000L, ll, lp)
+  o1 <- mcmc(theta, c(0L, 2L),  c(-Inf, 0),  c(Inf, Inf), blocks, n_unique_blocks, data, 5000L, 5000L, ll, lp)
 })
 
 o1$acceptance / 10000
@@ -60,15 +62,15 @@ drjacoby::run_mcmc(
   )
 
 bm <- microbenchmark::microbenchmark(
-  new = mcmc(theta, c(0L, 2L),  c(-Inf, 0),  c(Inf, Inf), data, 100000L, ll, lp),
+  new = mcmc(theta, c(0L, 2L),  c(-Inf, 0),  c(Inf, Inf), blocks, n_unique_blocks, data, 5000L, 5000L, ll, lp),
   old = drjacoby::run_mcmc(
     data = data_list,
     df_params = df_params,
     loglike = r_loglike,
     logprior = r_logprior,
     chains = 1,
-    burnin = 50000,
-    samples = 50000,
+    burnin = 5000,
+    samples = 5000,
     silent = TRUE
   ),
   times = 10
