@@ -4,7 +4,8 @@ devtools::load_all()
 true_theta <- c(0, 1)
 data <- rnorm(100, true_theta[1], true_theta[2])
 ll <- function(theta, data, block){
-  sum(dnorm(data, theta[1], theta[2], log = TRUE))
+  # calculate log-probability of data
+  sum(dnorm(data, mean = theta["mu"], sd = theta["sigma"], log = TRUE))
 }
 lp <- function(theta){
   return(0)

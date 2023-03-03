@@ -101,13 +101,16 @@ list mcmc(
   int block;
 
   // Initialise log_likelihood vector
-  std::vector<double> theta(n_par);
+  writable::doubles theta(n_par);
   for(int p = 0; p < n_par; ++p){
     theta[p] = theta_init[p];
     //std::cout << theta[p];
   }
+  theta.names() = {"mu", "sigma"};
   // Initialise vector for proposal theta
-  std::vector<double> theta_prop(n_par);
+  writable::doubles theta_prop(n_par);
+  theta_prop.names() = {"mu", "sigma"};
+
   // Initialise value for transformed theta: phi
   std::vector<double> phi(n_par);
   for(int p = 0; p < n_par; ++p){
@@ -136,7 +139,7 @@ list mcmc(
   // Initialise output matrix
   writable::doubles_matrix<> out(iterations, n_par);
   for(int p = 0; p < n_par; ++p){
-    out(0, p) = theta[p];
+    out(0, p) =  static_cast<double>(theta[p]);
   }
 
   // // Initialise proposal sd
@@ -151,15 +154,11 @@ list mcmc(
     acceptance[p] = 0;
   }
 
-  // Initialise vector for proposal theta
-  std::vector<double> current(n_par);
-  for(int p = 0; p < n_par; ++p){
-    current[p] = theta[p];
-  }
-
 
   for(int i = 1; i < iterations; ++i){
-    theta_prop = theta;
+    for(int p = 0; p < n_par; ++p){
+      theta_prop[p] = static_cast<double>(theta[p]);
+    }
     phi_prop = phi;
     ll_prop = ll;
     lp_prop = lp;
@@ -183,7 +182,7 @@ list mcmc(
         }
         acceptance[p] = acceptance[p] + 1;
       } else {
-        theta_prop[p] = theta[p];
+        theta_prop[p] =  static_cast<double>(theta[p]);
         phi_prop[p] = phi[p];
         ll_prop[block] = ll[block];
         lp_prop = lp;
@@ -192,7 +191,9 @@ list mcmc(
         }
       }
     }
-    theta = theta_prop;
+    for(int p = 0; p < n_par; ++p){
+      theta[p] = static_cast<double>(theta_prop[p]);
+    }
     phi = phi_prop;
     ll = ll_prop;
     lp = lp_prop;
@@ -201,7 +202,7 @@ list mcmc(
     log_prior[i] = lp;
     // Record parameters
     for(int p = 0; p < n_par; ++p){
-      out(i, p) = theta[p];
+      out(i, p) =  static_cast<double>(theta[p]);
     }
   }
 
