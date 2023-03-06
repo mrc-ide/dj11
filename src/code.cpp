@@ -80,12 +80,13 @@ double sum(std::vector<double> x) {
 [[cpp11::register]]
 list mcmc(
     doubles theta_init,
+    strings theta_names,
     integers transform_type,
     doubles theta_min,
     doubles theta_max,
     integers blocks,
     int n_unique_blocks,
-    doubles data,
+    list data,
     int burnin,
     int samples,
     function ll_f,
@@ -104,12 +105,11 @@ list mcmc(
   writable::doubles theta(n_par);
   for(int p = 0; p < n_par; ++p){
     theta[p] = theta_init[p];
-    //std::cout << theta[p];
   }
-  theta.names() = {"mu", "sigma"};
+  theta.names() = theta_names;
   // Initialise vector for proposal theta
   writable::doubles theta_prop(n_par);
-  theta_prop.names() = {"mu", "sigma"};
+  theta_prop.names() = theta_names;
 
   // Initialise value for transformed theta: phi
   std::vector<double> phi(n_par);

@@ -6,16 +6,16 @@
 #include <R_ext/Visibility.h>
 
 // code.cpp
-list mcmc(doubles theta_init, integers transform_type, doubles theta_min, doubles theta_max, integers blocks, int n_unique_blocks, doubles data, int burnin, int samples, function ll_f, function lp_f);
-extern "C" SEXP _dj11_mcmc(SEXP theta_init, SEXP transform_type, SEXP theta_min, SEXP theta_max, SEXP blocks, SEXP n_unique_blocks, SEXP data, SEXP burnin, SEXP samples, SEXP ll_f, SEXP lp_f) {
+list mcmc(doubles theta_init, strings theta_names, integers transform_type, doubles theta_min, doubles theta_max, integers blocks, int n_unique_blocks, list data, int burnin, int samples, function ll_f, function lp_f);
+extern "C" SEXP _dj11_mcmc(SEXP theta_init, SEXP theta_names, SEXP transform_type, SEXP theta_min, SEXP theta_max, SEXP blocks, SEXP n_unique_blocks, SEXP data, SEXP burnin, SEXP samples, SEXP ll_f, SEXP lp_f) {
   BEGIN_CPP11
-    return cpp11::as_sexp(mcmc(cpp11::as_cpp<cpp11::decay_t<doubles>>(theta_init), cpp11::as_cpp<cpp11::decay_t<integers>>(transform_type), cpp11::as_cpp<cpp11::decay_t<doubles>>(theta_min), cpp11::as_cpp<cpp11::decay_t<doubles>>(theta_max), cpp11::as_cpp<cpp11::decay_t<integers>>(blocks), cpp11::as_cpp<cpp11::decay_t<int>>(n_unique_blocks), cpp11::as_cpp<cpp11::decay_t<doubles>>(data), cpp11::as_cpp<cpp11::decay_t<int>>(burnin), cpp11::as_cpp<cpp11::decay_t<int>>(samples), cpp11::as_cpp<cpp11::decay_t<function>>(ll_f), cpp11::as_cpp<cpp11::decay_t<function>>(lp_f)));
+    return cpp11::as_sexp(mcmc(cpp11::as_cpp<cpp11::decay_t<doubles>>(theta_init), cpp11::as_cpp<cpp11::decay_t<strings>>(theta_names), cpp11::as_cpp<cpp11::decay_t<integers>>(transform_type), cpp11::as_cpp<cpp11::decay_t<doubles>>(theta_min), cpp11::as_cpp<cpp11::decay_t<doubles>>(theta_max), cpp11::as_cpp<cpp11::decay_t<integers>>(blocks), cpp11::as_cpp<cpp11::decay_t<int>>(n_unique_blocks), cpp11::as_cpp<cpp11::decay_t<list>>(data), cpp11::as_cpp<cpp11::decay_t<int>>(burnin), cpp11::as_cpp<cpp11::decay_t<int>>(samples), cpp11::as_cpp<cpp11::decay_t<function>>(ll_f), cpp11::as_cpp<cpp11::decay_t<function>>(lp_f)));
   END_CPP11
 }
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
-    {"_dj11_mcmc", (DL_FUNC) &_dj11_mcmc, 11},
+    {"_dj11_mcmc", (DL_FUNC) &_dj11_mcmc, 12},
     {NULL, NULL, 0}
 };
 }
