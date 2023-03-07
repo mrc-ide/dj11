@@ -23,7 +23,6 @@ double phi_to_theta(double phi, int transformation_type, double theta_min, doubl
   if(transformation_type == 3){
     theta = (theta_max * exp(phi) + theta_min) / (1 + exp(phi));
   }
-
   return(theta);
 }
 
@@ -90,18 +89,20 @@ list mcmc(
     int burnin,
     int samples,
     function ll_f,
-    function lp_f) {
+    function lp_f,
+    double target_acceptance) {
 
 
   int iterations = burnin + samples;
   int n_par = theta_init.size();
 
+  // Initialisise variables, ////////////////////////////////////////////////////
   double mh;
   bool mh_accept;
   double adjustment;
   int block;
 
-  // Initialise log_likelihood vector
+  // Initialise vector for theta
   writable::doubles theta(n_par);
   for(int p = 0; p < n_par; ++p){
     theta[p] = theta_init[p];
@@ -119,16 +120,20 @@ list mcmc(
   // Initialise vector for proposal phi
   std::vector<double> phi_prop(n_par);
 
-  // Initialise blocked log likelihood
+  // Initialise vector to store blocked log likelihood
   std::vector<double> ll(n_unique_blocks);
   for(int b = 0; b < n_unique_blocks; ++b){
     ll[b] = ll_f(theta, data, b);
   }
+  // Initialise vector to store proposal blocked log likelihood
   std::vector<double> ll_prop(n_unique_blocks);
   // Initialise log prior
   double lp = lp_f(theta);
+  // Initialise proposal log prior
   double lp_prop;
+  //////////////////////////////////////////////////////////////////////////////
 
+  // Outputs ///////////////////////////////////////////////////////////////////
   // Initialise log_likelihood output vector
   std::vector<double> log_likelihood(iterations);
   log_likelihood[0] = sum(ll);
@@ -141,8 +146,10 @@ list mcmc(
   for(int p = 0; p < n_par; ++p){
     out(0, p) =  static_cast<double>(theta[p]);
   }
+  //////////////////////////////////////////////////////////////////////////////
 
-  // // Initialise proposal sd
+  // Tuning ////////////////////////////////////////////////////////////////////
+  // Initialise proposal sd
   std::vector<double> proposal_sd(n_par);
   for(int p = 0; p < n_par; ++p){
     proposal_sd[p] = 0.1;
@@ -153,8 +160,10 @@ list mcmc(
   for(int p = 0; p < n_par; ++p){
     acceptance[p] = 0;
   }
+  //////////////////////////////////////////////////////////////////////////////
 
 
+  // Run ///////////////////////////////////////////////////////////////////////
   for(int i = 1; i < iterations; ++i){
     for(int p = 0; p < n_par; ++p){
       theta_prop[p] = static_cast<double>(theta[p]);
@@ -169,16 +178,17 @@ list mcmc(
       theta_prop[p] = phi_to_theta(phi_prop[p], transform_type[p], theta_min[p], theta_max[p]);
       ll_prop[block] = ll_f(theta_prop, data, block);
       lp_prop = lp_f(theta_prop);
-      // std::cout << "lp_prop: " << lp_prop << " ";
 
-      // calculate Metropolis-Hastings ratio
+      // get parameter transformation adjustment
       adjustment = get_adjustment(theta[p], theta_prop[p], transform_type[p], theta_min[p], theta_max[p]);
+      // calculate Metropolis-Hastings ratio
       mh = (sum(ll_prop) - sum(ll)) + (lp_prop - lp) + adjustment;
       // accept or reject move
       mh_accept = log(Rf_runif(0, 1)) < mh;
       if(mh_accept){
+        // Robbins monroe step
         if(i <= burnin){
-          proposal_sd[p] = exp(log(proposal_sd[p]) + (1 - 0.24) / sqrt(i));
+          proposal_sd[p] = exp(log(proposal_sd[p]) + (1 - target_acceptance) / sqrt(i));
         }
         acceptance[p] = acceptance[p] + 1;
       } else {
@@ -186,8 +196,9 @@ list mcmc(
         phi_prop[p] = phi[p];
         ll_prop[block] = ll[block];
         lp_prop = lp;
+        // Robbins monroe step
         if(i <= burnin){
-          proposal_sd[p] = exp(log(proposal_sd[p]) - 0.24 / sqrt(i));
+          proposal_sd[p] = exp(log(proposal_sd[p]) - target_acceptance / sqrt(i));
         }
       }
     }
@@ -206,7 +217,7 @@ list mcmc(
     }
   }
 
-
+  // Return outputs in a list
   return writable::list({
     "log_likelihood"_nm = log_likelihood,
       "log_prior"_nm = log_prior,
