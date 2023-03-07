@@ -1,4 +1,4 @@
-run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples){
+run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples, target_acceptance = 0.44){
 
   theta_init <- unlist(df_params$init)
   theta_names <- unlist(df_params$name)
@@ -8,7 +8,9 @@ run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples){
   blocks <- as.integer(unlist(df_params$block))
   n_unique_blocks <- length(unique(blocks))
 
-  mcmc(theta_init, theta_names, theta_transform_type,  theta_min,  theta_max, blocks, n_unique_blocks, data, burnin, samples, loglike, logprior)
+  mcmc(theta_init, theta_names, theta_transform_type,  theta_min,  theta_max,
+       blocks, n_unique_blocks, data, burnin, samples, loglike, logprior,
+       target_acceptance)
 }
 
 
