@@ -90,7 +90,8 @@ list mcmc(
     int samples,
     function ll_f,
     function lp_f,
-    double target_acceptance) {
+    double target_acceptance,
+    writable::list misc) {
 
 
   int iterations = burnin + samples;
@@ -101,6 +102,7 @@ list mcmc(
   bool mh_accept;
   double adjustment;
   int block;
+  misc.push_back({"block"_nm = 0});
 
   // Initialise vector for theta
   writable::doubles theta(n_par);
@@ -123,7 +125,8 @@ list mcmc(
   // Initialise vector to store blocked log likelihood
   std::vector<double> ll(n_unique_blocks);
   for(int b = 0; b < n_unique_blocks; ++b){
-    ll[b] = ll_f(theta, data, b);
+    misc["block"] = as_sexp(b);
+    ll[b] = ll_f(theta, data, misc);
   }
   // Initialise vector to store proposal blocked log likelihood
   std::vector<double> ll_prop(n_unique_blocks);
@@ -174,10 +177,11 @@ list mcmc(
     lp_prop = lp;
     for(int p = 0; p < n_par; ++p){
       block = blocks[p] - 1;
+      misc["block"] = as_sexp(block);
       // Propose new value
       phi_prop[p] = Rf_rnorm(phi[p], proposal_sd[p]);
       theta_prop[p] = phi_to_theta(phi_prop[p], transform_type[p], theta_min[p], theta_max[p]);
-      ll_prop[block] = ll_f(theta_prop, data, block);
+      ll_prop[block] = ll_f(theta_prop, data, misc);
       lp_prop = lp_f(theta_prop);
 
       // get parameter transformation adjustment

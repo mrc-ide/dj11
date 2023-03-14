@@ -6,7 +6,7 @@ using namespace cpp11;
 namespace writable = cpp11::writable;
 
 [[cpp11::register]]
-double cpp11_ll(doubles params, list data, int block){
+double cpp11_ll(doubles params, list data, list misc){
   // extract parameters
   double mu = params["mu"];
   double sigma = params["sigma"];
