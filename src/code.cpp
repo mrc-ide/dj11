@@ -168,6 +168,7 @@ list mcmc(
     for(int p = 0; p < n_par; ++p){
       theta_prop[p] = static_cast<double>(theta[p]);
     }
+    // TODO: Why is phi_prop not copied as with theta?
     phi_prop = phi;
     ll_prop = ll;
     lp_prop = lp;
