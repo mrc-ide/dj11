@@ -29,6 +29,8 @@ o1r <- run_dj11(
   samples = 5000L
 )
 
+plot(o1r$out[,1], t=  "l")
+
 # Load c++ log likelihoods
 cpp11::cpp_source("test_cpp11_ll.cpp")
 Rcpp::sourceCpp("test_rcpp_ll.cpp")

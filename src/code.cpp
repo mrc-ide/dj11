@@ -8,6 +8,7 @@
 using namespace cpp11;
 namespace writable = cpp11::writable;
 
+
 [[cpp11::register]]
 list mcmc(
     doubles theta_init,
@@ -37,13 +38,17 @@ list mcmc(
   misc.push_back({"block"_nm = 0});
 
   // Initialise vector for theta
-  writable::doubles theta(n_par);
+  std::vector<double> theta(n_par);
   for(int p = 0; p < n_par; ++p){
     theta[p] = theta_init[p];
   }
-  theta.names() = theta_names;
   // Initialise vector for proposal theta
+  // Proposal theta is always the theta given to the likelihood function
+  // and therefore must be a named vectord, which is why it is writebale::doubles
   writable::doubles theta_prop(n_par);
+  for(int p = 0; p < n_par; ++p){
+    theta_prop[p] = theta_init[p];
+  }
   theta_prop.names() = theta_names;
 
   // Initialise value for transformed theta: phi
@@ -58,7 +63,7 @@ list mcmc(
   std::vector<double> ll(n_unique_blocks);
   for(int b = 0; b < n_unique_blocks; ++b){
     misc["block"] = as_sexp(b);
-    ll[b] = ll_f(theta, data, misc);
+    ll[b] = ll_f(theta_prop, data, misc);
   }
   // Initialise vector to store proposal blocked log likelihood
   std::vector<double> ll_prop(n_unique_blocks);
@@ -79,7 +84,7 @@ list mcmc(
   // Initialise output matrix
   writable::doubles_matrix<> out(iterations, n_par);
   for(int p = 0; p < n_par; ++p){
-    out(0, p) =  static_cast<double>(theta[p]);
+    out(0, p) =  theta[p];
   }
   //////////////////////////////////////////////////////////////////////////////
 
@@ -101,9 +106,8 @@ list mcmc(
   // Run ///////////////////////////////////////////////////////////////////////
   for(int i = 1; i < iterations; ++i){
     for(int p = 0; p < n_par; ++p){
-      theta_prop[p] = static_cast<double>(theta[p]);
+      theta_prop[p] = theta[p];
     }
-    // TODO: Why is phi_prop not copied as with theta?
     phi_prop = phi;
     ll_prop = ll;
     lp_prop = lp;
@@ -129,7 +133,7 @@ list mcmc(
         }
         acceptance[p] = acceptance[p] + 1;
       } else {
-        theta_prop[p] =  static_cast<double>(theta[p]);
+        theta_prop[p] =  theta[p];
         phi_prop[p] = phi[p];
         ll_prop[block] = ll[block];
         lp_prop = lp;
@@ -140,7 +144,7 @@ list mcmc(
       }
     }
     for(int p = 0; p < n_par; ++p){
-      theta[p] = static_cast<double>(theta_prop[p]);
+      theta[p] = theta_prop[p];
     }
     phi = phi_prop;
     ll = ll_prop;
@@ -150,7 +154,7 @@ list mcmc(
     log_prior[i] = lp;
     // Record parameters
     for(int p = 0; p < n_par; ++p){
-      out(i, p) =  static_cast<double>(theta[p]);
+      out(i, p) =  theta[p];
     }
   }
 
