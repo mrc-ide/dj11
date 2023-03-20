@@ -2,79 +2,11 @@
 #include "cpp11/matrix.hpp"
 #include "cpp11/doubles.hpp"
 #include "Rmath.h"
+#include "utils.h"
+#include "transform.h"
 #include <vector>
-#include <iostream>
 using namespace cpp11;
 namespace writable = cpp11::writable;
-
-double phi_to_theta(double phi, int transformation_type, double theta_min, double theta_max) {
-
-  double theta;
-
-  if(transformation_type == 0){
-    theta = phi;
-  }
-  if(transformation_type == 1){
-    theta = theta_max - exp(phi);
-  }
-  if(transformation_type == 2){
-    theta = exp(phi) + theta_min;
-  }
-  if(transformation_type == 3){
-    theta = (theta_max * exp(phi) + theta_min) / (1 + exp(phi));
-  }
-  return(theta);
-}
-
-double theta_to_phi(double theta, int transformation_type, double theta_min, double theta_max) {
-
-  double phi;
-
-  if(transformation_type == 0){
-    phi = theta;
-  }
-  if(transformation_type == 1){
-    phi = log(theta_max - theta);
-  }
-  if(transformation_type == 2){
-    phi = log(theta - theta_min);
-  }
-  if(transformation_type == 3){
-    phi = log(theta - theta_min) - log(theta_max - theta);
-  }
-
-  return(phi);
-}
-
-double get_adjustment(double theta, double theta_prop, int transformation_type, double theta_min, double theta_max) {
-
-  double adjustment;
-
-  if(transformation_type == 0){
-    adjustment = 0.0;
-  }
-  if(transformation_type == 1){
-    adjustment = log(theta_max - theta_prop) - log(theta_max - theta);
-  }
-  if(transformation_type == 2){
-    adjustment = log(theta_prop - theta_min) - log(theta - theta_min);
-  }
-  if(transformation_type == 3){
-    adjustment = log(theta_max - theta_prop) + log(theta_prop - theta_min) - log(theta_max - theta) - log(theta - theta_min);
-
-  }
-  return(adjustment);
-}
-
-double sum(std::vector<double> x) {
-  int n = x.size();
-  double total = 0;
-  for(int i = 0; i < n; ++i) {
-    total += x[i];
-  }
-  return total;
-}
-
 
 [[cpp11::register]]
 list mcmc(
