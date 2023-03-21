@@ -24,7 +24,9 @@ list mcmc(
     function ll_f,
     function lp_f,
     double target_acceptance,
-    writable::list misc) {
+    writable::list misc,
+    int n_rungs,
+    doubles beta_init) {
 
 
   int iterations = burnin + samples;
@@ -102,59 +104,92 @@ list mcmc(
   }
   //////////////////////////////////////////////////////////////////////////////
 
+  // PT ////////////////////////////////////////////////////////////////////////
+  int rung;
+  double rung_beta;
+  double rung_proposal_sd;
+
+  // Index of rungs, 0 = cold rung, n_rungs - 1 = hot rung
+  std::vector<int> rung_index(n_rungs);
+  for(int r = 0; r < n_rungs; ++r){
+    rung_index[r] = r;
+  }
+  // Betas for each rung
+  std:vector<double> beta(n_rungs);
+  for(int r = 0; r < n_rungs; ++r){
+    beta[r] = beta_init[r];
+  }
+  //////////////////////////////////////////////////////////////////////////////
+
 
   // Run ///////////////////////////////////////////////////////////////////////
   for(int i = 1; i < iterations; ++i){
-    for(int p = 0; p < n_par; ++p){
-      theta_prop[p] = theta[p];
-    }
-    phi_prop = phi;
-    ll_prop = ll;
-    lp_prop = lp;
-    for(int p = 0; p < n_par; ++p){
-      block = blocks[p] - 1;
-      misc["block"] = as_sexp(block);
-      // Propose new value
-      phi_prop[p] = Rf_rnorm(phi[p], proposal_sd[p]);
-      theta_prop[p] = phi_to_theta(phi_prop[p], transform_type[p], theta_min[p], theta_max[p]);
-      ll_prop[block] = ll_f(theta_prop, data, misc);
-      lp_prop = lp_f(theta_prop);
+    for(int r = 0; r < n_rungs; ++r){
+      rung_beta = beta[rung_index[r]];
 
-      // get parameter transformation adjustment
-      adjustment = get_adjustment(theta[p], theta_prop[p], transform_type[p], theta_min[p], theta_max[p]);
-      // calculate Metropolis-Hastings ratio
-      mh = (sum(ll_prop) - sum(ll)) + (lp_prop - lp) + adjustment;
-      // accept or reject move
-      mh_accept = log(Rf_runif(0, 1)) < mh;
-      if(mh_accept){
-        // Robbins monroe step
-        if(i <= burnin){
-          proposal_sd[p] = exp(log(proposal_sd[p]) + (1 - target_acceptance) / sqrt(i));
-        }
-        acceptance[p] = acceptance[p] + 1;
-      } else {
-        theta_prop[p] =  theta[p];
-        phi_prop[p] = phi[p];
-        ll_prop[block] = ll[block];
-        lp_prop = lp;
-        // Robbins monroe step
-        if(i <= burnin){
-          proposal_sd[p] = exp(log(proposal_sd[p]) - target_acceptance / sqrt(i));
+
+      for(int p = 0; p < n_par; ++p){
+        theta_prop[p][r] = theta[p][r];
+        phi_prop[p][r] = phi[p][r];
+      }
+      for(int b = 0; b < n_unique_blocks; ++b){
+        ll_prop[b][r] = ll[b][r];
+      }
+      lp_prop[r] = lp[r];
+
+      for(int p = 0; p < n_par; ++p){
+
+        block = blocks[p] - 1;
+        misc["block"] = as_sexp(block);
+        // Propose new value
+        phi_prop[p][r] = Rf_rnorm(phi[p][r], proposal_sd[p, rung_index[r]]);
+        theta_prop[p][r] = phi_to_theta(phi_prop[p][r], transform_type[p], theta_min[p], theta_max[p]);
+        ll_prop[block][r] = ll_f(theta_prop[,r], data, misc);
+        lp_prop[r] = lp_f(theta_prop[,r]);
+
+        // get parameter transformation adjustment
+        adjustment = get_adjustment(theta[p][r], theta_prop[p][r], transform_type[p], theta_min[p], theta_max[p]);
+        // calculate Metropolis-Hastings ratio
+        mh = (sum(ll_prop[,r]) - sum(ll[,r])) + (lp_prop[r] - lp[r]) + adjustment;
+        // accept or reject move
+        mh_accept = log(Rf_runif(0, 1)) < mh;
+        if(mh_accept){
+          // Robbins monroe step
+          if(i <= burnin){
+            proposal_sd[p, rung_index[r]] = exp(log(proposal_sd[p, rung_index[r]]) + (1 - target_acceptance) / sqrt(i));
+          }
+          acceptance[p][r] = acceptance[p][r] + 1;
+        } else {
+          theta_prop[p][r] =  theta[p][r];
+          phi_prop[p][r] = phi[p][r];
+          ll_prop[block][r] = ll[block][r];
+          lp_prop[r] = lp[r];
+          // Robbins monroe step
+          if(i <= burnin){
+            proposal_sd[p, rung_index[r]] = exp(log(proposal_sd[p, rung_index[r]]) - target_acceptance / sqrt(i));
+          }
         }
       }
-    }
-    for(int p = 0; p < n_par; ++p){
-      theta[p] = theta_prop[p];
-    }
-    phi = phi_prop;
-    ll = ll_prop;
-    lp = lp_prop;
-    // Record log likelihood
-    log_likelihood[i] = sum(ll);
-    log_prior[i] = lp;
-    // Record parameters
-    for(int p = 0; p < n_par; ++p){
-      out(i, p) =  theta[p];
+
+      for(int p = 0; p < n_par; ++p){
+        theta[p][r] = theta_prop[p][r];
+        phi[p][r] = phi_prop[p][r];
+      }
+      for(int b = 0; b < n_unique_blocks; ++b){
+        ll[b][r] = ll_prop[b][r];
+      }
+      lp[r] = lp_prop[r];
+
+      // Only store values for the cold chain
+      if(rung_index[r] == 0){
+        // Record log likelihood
+        log_likelihood[i] = sum(ll[,r]);
+        log_prior[i] = lp[r];
+        // Record parameters
+        for(int p = 0; p < n_par; ++p){
+          out(i, p) =  theta[p][r];
+        }
+      }
     }
   }
 
