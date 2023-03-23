@@ -39,14 +39,16 @@ list mcmc(
   int block;
   misc.push_back({"block"_nm = 0});
 
-  // Initialise vector for theta
-  std::vector<double> theta(n_par);
-  for(int p = 0; p < n_par; ++p){
-    theta[p] = theta_init[p];
+  // Initialise matrix for theta
+  double theta[n_par][n_rungs];
+  for(int i = 0; i < n_par; ++i){
+    for(int j = 0; j < n_rungs; ++j){
+      theta[i][j] = theta_init[i];
+    }
   }
   // Initialise vector for proposal theta
   // Proposal theta is always the theta given to the likelihood function
-  // and therefore must be a named vectord, which is why it is writebale::doubles
+  // and therefore must be a named vectord, which is why it is writeable::doubles
   writable::doubles theta_prop(n_par);
   for(int p = 0; p < n_par; ++p){
     theta_prop[p] = theta_init[p];
@@ -56,51 +58,71 @@ list mcmc(
   // Initialise value for transformed theta: phi
   std::vector<double> phi(n_par);
   for(int p = 0; p < n_par; ++p){
-    phi[p] = theta_to_phi(theta[p], transform_type[p], theta_min[p], theta_max[p]);
+    phi[p] = theta_to_phi(theta[p][0], transform_type[p], theta_min[p], theta_max[p]);
   }
   // Initialise vector for proposal phi
   std::vector<double> phi_prop(n_par);
 
   // Initialise vector to store blocked log likelihood
-  std::vector<double> ll(n_unique_blocks);
+  std::vector<double> block_ll(n_unique_blocks);
   for(int b = 0; b < n_unique_blocks; ++b){
     misc["block"] = as_sexp(b);
-    ll[b] = ll_f(theta_prop, data, misc);
+    block_ll[b] = ll_f(theta_prop, data, misc);
   }
   // Initialise vector to store proposal blocked log likelihood
-  std::vector<double> ll_prop(n_unique_blocks);
+  std::vector<double> block_ll_prop(n_unique_blocks);
+  // Initialise vector to store rung log likelihood (summed over blocks)
+  std::vector<double> ll(n_rungs);
+  for(int r = 0; r < n_rungs; ++r){
+    double sum_ll = 0;
+    for(int b = 0; b < n_unique_blocks; ++b){
+      sum_ll += block_ll[b];
+    }
+    ll[r] = sum_ll;
+  }
+
   // Initialise log prior
-  double lp = lp_f(theta);
+  double lp = lp_f(theta_prop);
   // Initialise proposal log prior
   double lp_prop;
   //////////////////////////////////////////////////////////////////////////////
 
   // Outputs ///////////////////////////////////////////////////////////////////
   // Initialise log_likelihood output vector
-  std::vector<double> log_likelihood(iterations);
-  log_likelihood[0] = sum(ll);
+  std::vector<double> out_log_likelihood(iterations);
+  out_log_likelihood[0] = ll[0];
   // Initialise log_prior output vector
-  std::vector<double> log_prior(iterations);
-  log_prior[0] = lp;
+  std::vector<double> out_log_prior(iterations);
+  out_log_prior[0] = lp;
 
   // Initialise output matrix
-  writable::doubles_matrix<> out(iterations, n_par);
+  writable::doubles_matrix<> out_theta(iterations, n_par);
   for(int p = 0; p < n_par; ++p){
-    out(0, p) =  theta[p];
+    out_theta(0, p) =  theta[p][0];
   }
   //////////////////////////////////////////////////////////////////////////////
 
   // Tuning ////////////////////////////////////////////////////////////////////
-  // Initialise proposal sd
-  std::vector<double> proposal_sd(n_par);
-  for(int p = 0; p < n_par; ++p){
-    proposal_sd[p] = 0.1;
+  // Initialise matrix for proposal sd
+  double proposal_sd[n_par][n_rungs];
+  for(int i = 0; i < n_par; ++i){
+    for(int j = 0; j < n_rungs; ++j){
+      proposal_sd[i][j] = 0.1;
+    }
   }
 
-  // Initialise acceptance count vector
-  std::vector<double> acceptance(n_par);
-  for(int p = 0; p < n_par; ++p){
-    acceptance[p] = 0;
+  // Initialise acceptance count matrix
+  int acceptance[n_par][n_rungs];
+  for(int i = 0; i < n_par; ++i){
+    for(int j = 0; j < n_rungs; ++j){
+      acceptance[i][j] = 0;
+    }
+  }
+
+  // Initialise swap acceptance count vector
+  std::vector<int> swap_acceptance(n_rungs - 1);
+  for(int i = 0; i < (n_rungs - 1); ++i){
+    swap_acceptance[i] = 0;
   }
   //////////////////////////////////////////////////////////////////////////////
 
@@ -108,6 +130,7 @@ list mcmc(
   int rung;
   double rung_beta;
   double rung_proposal_sd;
+  int index;
 
   // Index of rungs, 0 = cold rung, n_rungs - 1 = hot rung
   std::vector<int> rung_index(n_rungs);
@@ -115,7 +138,7 @@ list mcmc(
     rung_index[r] = r;
   }
   // Betas for each rung
-  std:vector<double> beta(n_rungs);
+  std::vector<double> beta(n_rungs);
   for(int r = 0; r < n_rungs; ++r){
     beta[r] = beta_init[r];
   }
@@ -125,69 +148,72 @@ list mcmc(
   // Run ///////////////////////////////////////////////////////////////////////
   for(int i = 1; i < iterations; ++i){
     for(int r = 0; r < n_rungs; ++r){
-      rung_beta = beta[rung_index[r]];
+      rung_beta = beta[r];
+      // TODO: BETA RAISED NOT USED
+      index = rung_index[r];
 
-
+      // Copy rung theta and phi
       for(int p = 0; p < n_par; ++p){
-        theta_prop[p][r] = theta[p][r];
-        phi_prop[p][r] = phi[p][r];
+        theta_prop[p] = theta[p][index];
+        phi_prop[p] = phi[p];
       }
       for(int b = 0; b < n_unique_blocks; ++b){
-        ll_prop[b][r] = ll[b][r];
+        block_ll_prop[b] = block_ll[b];
       }
-      lp_prop[r] = lp[r];
+      lp_prop = lp;
 
       for(int p = 0; p < n_par; ++p){
-
+        // Set block for parameter
         block = blocks[p] - 1;
         misc["block"] = as_sexp(block);
         // Propose new value
-        phi_prop[p][r] = Rf_rnorm(phi[p][r], proposal_sd[p, rung_index[r]]);
-        theta_prop[p][r] = phi_to_theta(phi_prop[p][r], transform_type[p], theta_min[p], theta_max[p]);
-        ll_prop[block][r] = ll_f(theta_prop[,r], data, misc);
-        lp_prop[r] = lp_f(theta_prop[,r]);
+        phi_prop[p] = Rf_rnorm(phi[p], proposal_sd[p][r]);
+        theta_prop[p] = phi_to_theta(phi_prop[p], transform_type[p], theta_min[p], theta_max[p]);
+        block_ll_prop[block] = ll_f(theta_prop, data, misc);
+        lp_prop = lp_f(theta_prop);
 
         // get parameter transformation adjustment
-        adjustment = get_adjustment(theta[p][r], theta_prop[p][r], transform_type[p], theta_min[p], theta_max[p]);
+        adjustment = get_adjustment(theta[p][index], theta_prop[p], transform_type[p], theta_min[p], theta_max[p]);
         // calculate Metropolis-Hastings ratio
-        mh = (sum(ll_prop[,r]) - sum(ll[,r])) + (lp_prop[r] - lp[r]) + adjustment;
+        mh = (sum(block_ll_prop) - sum(block_ll)) + (lp_prop - lp) + adjustment;
         // accept or reject move
         mh_accept = log(Rf_runif(0, 1)) < mh;
         if(mh_accept){
           // Robbins monroe step
           if(i <= burnin){
-            proposal_sd[p, rung_index[r]] = exp(log(proposal_sd[p, rung_index[r]]) + (1 - target_acceptance) / sqrt(i));
+            proposal_sd[p][r] = exp(log(proposal_sd[p][r]) + (1 - target_acceptance) / sqrt(i));
           }
           acceptance[p][r] = acceptance[p][r] + 1;
         } else {
-          theta_prop[p][r] =  theta[p][r];
-          phi_prop[p][r] = phi[p][r];
-          ll_prop[block][r] = ll[block][r];
-          lp_prop[r] = lp[r];
+          theta_prop[p] =  theta[p][index];
+          phi_prop[p] = phi[p];
+          block_ll_prop[block] = block_ll[block];
+          lp_prop = lp;
           // Robbins monroe step
           if(i <= burnin){
-            proposal_sd[p, rung_index[r]] = exp(log(proposal_sd[p, rung_index[r]]) - target_acceptance / sqrt(i));
+            proposal_sd[p][r] = exp(log(proposal_sd[p][r]) - target_acceptance / sqrt(i));
           }
         }
       }
 
       for(int p = 0; p < n_par; ++p){
-        theta[p][r] = theta_prop[p][r];
-        phi[p][r] = phi_prop[p][r];
+        theta[p][index] = theta_prop[p];
+        phi[p] = phi_prop[p];
       }
       for(int b = 0; b < n_unique_blocks; ++b){
-        ll[b][r] = ll_prop[b][r];
+        block_ll[b] = block_ll_prop[b];
       }
-      lp[r] = lp_prop[r];
+      lp = lp_prop;
+      ll[r] = sum(block_ll);
 
       // Only store values for the cold chain
-      if(rung_index[r] == 0){
+      if(r == 0){
         // Record log likelihood
-        log_likelihood[i] = sum(ll[,r]);
-        log_prior[i] = lp[r];
+        out_log_likelihood[i] = ll[r];
+        out_log_prior[i] = lp;
         // Record parameters
         for(int p = 0; p < n_par; ++p){
-          out(i, p) =  theta[p][r];
+          out_theta(i, p) =  theta[p][index];
         }
       }
     }
@@ -195,10 +221,10 @@ list mcmc(
 
   // Return outputs in a list
   return writable::list({
-    "log_likelihood"_nm = log_likelihood,
-      "log_prior"_nm = log_prior,
-      "out"_nm = out,
-      "proposal_sd"_nm = proposal_sd,
-      "acceptance"_nm = acceptance
+    "log_likelihood"_nm = out_log_likelihood,
+      "log_prior"_nm = out_log_prior,
+      "out"_nm = out_theta,
+      "proposal_sd"_nm = proposal_sd[0][0],
+      "acceptance"_nm = acceptance[0][0]
   });
 }
