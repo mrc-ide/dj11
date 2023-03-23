@@ -31,7 +31,7 @@ o1r <- run_dj11(
   n_rungs = 2
 )
 
-plot(o1r$out[,1], t=  "l")
+plot(o1r$out[,2], t=  "l")
 
 # Load c++ log likelihoods
 cpp11::cpp_source("test_cpp11_ll.cpp")

@@ -56,9 +56,11 @@ list mcmc(
   theta_prop.names() = theta_names;
 
   // Initialise value for transformed theta: phi
-  std::vector<double> phi(n_par);
-  for(int p = 0; p < n_par; ++p){
-    phi[p] = theta_to_phi(theta[p][0], transform_type[p], theta_min[p], theta_max[p]);
+  double phi[n_par][n_rungs];
+  for(int i = 0; i < n_par; ++i){
+    for(int j = 0; j < n_rungs; ++j){
+      phi[i][j] = theta_to_phi(theta[i][0], transform_type[i], theta_min[i], theta_max[i]);
+    }
   }
   // Initialise vector for proposal phi
   std::vector<double> phi_prop(n_par);
@@ -160,7 +162,7 @@ list mcmc(
       // Copy rung theta and phi
       for(int p = 0; p < n_par; ++p){
         theta_prop[p] = theta[p][index];
-        phi_prop[p] = phi[p];
+        phi_prop[p] = phi[p][index];
       }
       for(int b = 0; b < n_unique_blocks; ++b){
         // TODO I think block_ll also needs to be indexed like theta
@@ -173,7 +175,7 @@ list mcmc(
         block = blocks[p] - 1;
         misc["block"] = as_sexp(block);
         // Propose new value
-        phi_prop[p] = Rf_rnorm(phi[p], proposal_sd[p][r]);
+        phi_prop[p] = Rf_rnorm(phi[p][index], proposal_sd[p][r]);
         theta_prop[p] = phi_to_theta(phi_prop[p], transform_type[p], theta_min[p], theta_max[p]);
         block_ll_prop[block] = ll_f(theta_prop, data, misc);
         lp_prop = lp_f(theta_prop);
@@ -192,7 +194,7 @@ list mcmc(
           acceptance[p][r] = acceptance[p][r] + 1;
         } else {
           theta_prop[p] =  theta[p][index];
-          phi_prop[p] = phi[p];
+          phi_prop[p] = phi[p][index];
           block_ll_prop[block] = block_ll[block][index];
           lp_prop = lp[r];
           // Robbins monroe step
@@ -204,7 +206,7 @@ list mcmc(
 
       for(int p = 0; p < n_par; ++p){
         theta[p][index] = theta_prop[p];
-        phi[p] = phi_prop[p];
+        phi[p][index] = phi_prop[p];
       }
       for(int b = 0; b < n_unique_blocks; ++b){
         block_ll[b][index] = block_ll_prop[b];
