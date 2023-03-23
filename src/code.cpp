@@ -64,11 +64,14 @@ list mcmc(
   std::vector<double> phi_prop(n_par);
 
   // Initialise vector to store blocked log likelihood
-  std::vector<double> block_ll(n_unique_blocks);
-  for(int b = 0; b < n_unique_blocks; ++b){
-    misc["block"] = as_sexp(b);
-    block_ll[b] = ll_f(theta_prop, data, misc);
+  double block_ll[n_unique_blocks][n_rungs];
+  for(int i = 0; i < n_unique_blocks; ++i){
+    misc["block"] = as_sexp(i);
+    for(int j = 0; j < n_rungs; ++j){
+      block_ll[i][j] = ll_f(theta_prop, data, misc);
+    }
   }
+
   // Initialise vector to store proposal blocked log likelihood
   std::vector<double> block_ll_prop(n_unique_blocks);
   // Initialise vector to store rung log likelihood (summed over blocks)
@@ -76,13 +79,16 @@ list mcmc(
   for(int r = 0; r < n_rungs; ++r){
     double sum_ll = 0;
     for(int b = 0; b < n_unique_blocks; ++b){
-      sum_ll += block_ll[b];
+      sum_ll += block_ll[b][r];
     }
     ll[r] = sum_ll;
   }
 
-  // Initialise log prior
-  double lp = lp_f(theta_prop);
+  // Initialise log prior vector
+  std::vector<double> lp(n_rungs);
+  for(int r = 0; r < n_rungs; ++r){
+    lp[r] = lp_f(theta_prop);
+  }
   // Initialise proposal log prior
   double lp_prop;
   //////////////////////////////////////////////////////////////////////////////
@@ -93,7 +99,7 @@ list mcmc(
   out_log_likelihood[0] = ll[0];
   // Initialise log_prior output vector
   std::vector<double> out_log_prior(iterations);
-  out_log_prior[0] = lp;
+  out_log_prior[0] = lp[0];
 
   // Initialise output matrix
   writable::doubles_matrix<> out_theta(iterations, n_par);
@@ -149,7 +155,6 @@ list mcmc(
   for(int i = 1; i < iterations; ++i){
     for(int r = 0; r < n_rungs; ++r){
       rung_beta = beta[r];
-      // TODO: BETA RAISED NOT USED
       index = rung_index[r];
 
       // Copy rung theta and phi
@@ -158,9 +163,10 @@ list mcmc(
         phi_prop[p] = phi[p];
       }
       for(int b = 0; b < n_unique_blocks; ++b){
-        block_ll_prop[b] = block_ll[b];
+        // TODO I think block_ll also needs to be indexed like theta
+        block_ll_prop[b] = block_ll[b][index];
       }
-      lp_prop = lp;
+      lp_prop = lp[r];
 
       for(int p = 0; p < n_par; ++p){
         // Set block for parameter
@@ -175,7 +181,7 @@ list mcmc(
         // get parameter transformation adjustment
         adjustment = get_adjustment(theta[p][index], theta_prop[p], transform_type[p], theta_min[p], theta_max[p]);
         // calculate Metropolis-Hastings ratio
-        mh = (sum(block_ll_prop) - sum(block_ll)) + (lp_prop - lp) + adjustment;
+        mh = rung_beta * (sum(block_ll_prop) - ll[r]) + (lp_prop - lp[r]) + adjustment;
         // accept or reject move
         mh_accept = log(Rf_runif(0, 1)) < mh;
         if(mh_accept){
@@ -187,8 +193,8 @@ list mcmc(
         } else {
           theta_prop[p] =  theta[p][index];
           phi_prop[p] = phi[p];
-          block_ll_prop[block] = block_ll[block];
-          lp_prop = lp;
+          block_ll_prop[block] = block_ll[block][index];
+          lp_prop = lp[r];
           // Robbins monroe step
           if(i <= burnin){
             proposal_sd[p][r] = exp(log(proposal_sd[p][r]) - target_acceptance / sqrt(i));
@@ -201,16 +207,16 @@ list mcmc(
         phi[p] = phi_prop[p];
       }
       for(int b = 0; b < n_unique_blocks; ++b){
-        block_ll[b] = block_ll_prop[b];
+        block_ll[b][index] = block_ll_prop[b];
       }
-      lp = lp_prop;
-      ll[r] = sum(block_ll);
+      lp[r] = lp_prop;
+      ll[r] = sum(block_ll_prop);
 
       // Only store values for the cold chain
       if(r == 0){
         // Record log likelihood
         out_log_likelihood[i] = ll[r];
-        out_log_prior[i] = lp;
+        out_log_prior[i] = lp[r];
         // Record parameters
         for(int p = 0; p < n_par; ++p){
           out_theta(i, p) =  theta[p][index];
@@ -225,6 +231,6 @@ list mcmc(
       "log_prior"_nm = out_log_prior,
       "out"_nm = out_theta,
       "proposal_sd"_nm = proposal_sd[0][0],
-      "acceptance"_nm = acceptance[0][0]
+                                       "acceptance"_nm = acceptance[0][0]
   });
 }

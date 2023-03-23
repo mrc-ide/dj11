@@ -1,5 +1,6 @@
 
 devtools::load_all()
+par(mfrow = c(1, 1))
 
 # Create data
 true_theta <- c(0, 1)
@@ -26,7 +27,8 @@ o1r <- run_dj11(
   loglike = ll,
   logprior = lp,
   burnin = 5000L,
-  samples = 5000L
+  samples = 5000L,
+  n_rungs = 2
 )
 
 plot(o1r$out[,1], t=  "l")

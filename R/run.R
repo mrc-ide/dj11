@@ -1,5 +1,5 @@
 run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples, target_acceptance = 0.44, misc = list(),
-                     n_rungs = 1, beta_init = 1){
+                     n_rungs = 1){
 
   theta_init <- unlist(df_params$init)
   theta_names <- unlist(df_params$name)
@@ -8,6 +8,7 @@ run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples, target
   theta_transform_type <- get_transform_type(theta_min, theta_max)
   blocks <- as.integer(unlist(df_params$block))
   n_unique_blocks <- length(unique(blocks))
+  beta_init <- seq(1, 0, length.out = n_rungs)
 
   mcmc(theta_init, theta_names, theta_transform_type,  theta_min,  theta_max,
        blocks, n_unique_blocks, data, burnin, samples, loglike, logprior,
