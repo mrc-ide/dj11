@@ -225,6 +225,21 @@ list mcmc(
         }
       }
     }
+
+    // Rung swaps
+    for(int r = 0; r < (n_rungs - 1); ++r){
+      rung_beta = beta[r];
+      mh = rung_beta * (ll[r + 1] - ll[r]) + (lp[r + 1] - lp[r]);
+      // accept or reject move
+      mh_accept = log(Rf_runif(0, 1)) < mh;
+      if(mh_accept){
+        swap_acceptance[r] += 1;
+        int ri1 = rung_index[r];
+        int ri2 = rung_index[r + 1];
+        rung_index[r] = ri2;
+        rung_index[r + 1] = ri1;
+      }
+    }
   }
 
   // Return outputs in a list
@@ -233,6 +248,8 @@ list mcmc(
       "log_prior"_nm = out_log_prior,
       "out"_nm = out_theta,
       "proposal_sd"_nm = proposal_sd[0][0],
-                                       "acceptance"_nm = acceptance[0][0]
+                                       "acceptance"_nm = acceptance[0][0],
+                                                                      "rung_index"_nm = rung_index,
+                                                                      "swap_acceptance"_nm = swap_acceptance
   });
 }

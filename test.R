@@ -28,10 +28,13 @@ o1r <- run_dj11(
   logprior = lp,
   burnin = 5000L,
   samples = 5000L,
-  n_rungs = 2
+  n_rungs = 10
 )
 
-plot(o1r$out[,2], t=  "l")
+o1r$rung_index
+o1r$swap_acceptance / 10000
+
+plot(o1r$out[,1], t=  "l")
 
 # Load c++ log likelihoods
 cpp11::cpp_source("test_cpp11_ll.cpp")
