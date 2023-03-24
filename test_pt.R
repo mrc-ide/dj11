@@ -36,7 +36,7 @@ pt1 <- run_dj11(
 )
 
 par(mfrow = c(1, 3))
-plot(pt1$out[1e3:(1e3 + 1e4), 1:2], xlab = "alpha", ylab = "beta")
+plot(pt1$out[pt1$out$phase == "sampling", c("alpha", "beta")], xlab = "alpha", ylab = "beta")
 
 pt2 <- run_dj11(
   data = data_list,
@@ -50,7 +50,7 @@ pt2 <- run_dj11(
 pt2$rung_index
 sort(pt2$rung_index)
 pt2$swap_acceptance / (1e3 + 1e4)
-plot(pt2$out[5000:10000,1:2], xlab = "alpha", ylab = "beta")
+plot(pt2$out[pt1$out$phase == "sampling", c("alpha", "beta")], xlab = "alpha", ylab = "beta")
 
 mb <- microbenchmark::microbenchmark(
   new_1rung = run_dj11(

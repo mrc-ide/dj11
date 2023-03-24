@@ -15,9 +15,16 @@ run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples, target
   stopifnot(is.integer(n_unique_blocks))
   stopifnot(is.integer(n_rungs))
 
-  mcmc(theta_init, theta_names, theta_transform_type,  theta_min,  theta_max,
+  out <- mcmc(theta_init, theta_names, theta_transform_type,  theta_min,  theta_max,
        blocks_list, n_unique_blocks, data, burnin, samples, loglike, logprior,
        target_acceptance, misc, n_rungs, beta_init, swap)
+  out$out <- cbind(
+    data.frame(chain = 1, phase = rep(c("burnin", "sampling"), c(burnin, samples))),
+    out$out
+    )
+  names(out$out) <- c("chain", "phase", "iteration", theta_names, "logprior", "loglikelihood")
+  return(out)
+
 }
 
 

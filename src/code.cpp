@@ -97,18 +97,14 @@ list mcmc(
   //////////////////////////////////////////////////////////////////////////////
 
   // Outputs ///////////////////////////////////////////////////////////////////
-  // Initialise log_likelihood output vector
-  std::vector<double> out_log_likelihood(iterations);
-  out_log_likelihood[0] = ll[0];
-  // Initialise log_prior output vector
-  std::vector<double> out_log_prior(iterations);
-  out_log_prior[0] = lp[0];
-
   // Initialise output matrix
-  writable::doubles_matrix<> out_theta(iterations, n_par);
-  for(int p = 0; p < n_par; ++p){
-    out_theta(0, p) =  theta[0][p];
+  writable::doubles_matrix<> out(iterations, n_par + 3);
+  out(0, 0) = 1;
+  for(int p = 1; p < (n_par + 1); ++p){
+    out(0, p) =  theta[0][p];
   }
+  out(0, n_par + 1) = lp[0];
+  out(0, n_par + 2) = ll[0];
   //////////////////////////////////////////////////////////////////////////////
 
   // Tuning ////////////////////////////////////////////////////////////////////
@@ -224,13 +220,13 @@ list mcmc(
       }
       // Only store values for the cold chain
       if(r == 0){
-        // Record log likelihood
-        out_log_likelihood[i] = ll[r];
-        out_log_prior[i] = lp[r];
+        out(i, 0) = i;
         // Record parameters
         for(int p = 0; p < n_par; ++p){
-          out_theta(i, p) =  theta[index][p];
+          out(i, p + 1) =  theta[index][p];
         }
+        out(i, n_par + 1) = lp[0];
+        out(i, n_par + 2) = ll[0];
       }
     }
 
@@ -270,9 +266,7 @@ list mcmc(
 
   // Return outputs in a list
   return writable::list({
-    "log_likelihood"_nm = out_log_likelihood,
-      "log_prior"_nm = out_log_prior,
-      "out"_nm = out_theta,
+      "out"_nm = out,
       "proposal_sd"_nm = proposal_sd_out,
       "acceptance"_nm = acceptance_out,
       "rung_index"_nm = rung_index,
