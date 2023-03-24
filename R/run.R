@@ -82,6 +82,12 @@ run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples, target
 }
 
 run_internal <- function(x, input){
+  if(is.character(input$loglike)){
+    input$loglike <- get(input$loglike)
+  }
+  if(is.character(input$loglike)){
+    input$loglike <- get(input$logprior)
+  }
   mcmc_out <- mcmc(input$theta_init, input$theta_names, input$theta_transform_type,  input$theta_min,  input$theta_max,
                    input$blocks_list, input$n_unique_blocks, input$data, input$burnin, input$samples, input$loglike, input$logprior,
                    input$target_acceptance, input$misc, input$n_rungs, input$beta_init, input$swap)

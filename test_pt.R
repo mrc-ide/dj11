@@ -48,7 +48,7 @@ pt2 <- run_dj11(
   n_rungs = 20L
 )
 pt2$diagnostics$rung_index
-sort(pt2$diagnostics$rung_index)
+sort(unlist(pt2$diagnostics$rung_index))
 pt2$diagnostics$mc_accept
 plot(pt2$output[pt1$output$phase == "sampling", c("alpha", "beta")], xlab = "alpha", ylab = "beta")
 

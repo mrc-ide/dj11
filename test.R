@@ -47,7 +47,7 @@ Rcpp::sourceCpp("test_rcpp_ll.cpp")
 o1c <- run_dj11(
   data = data_list,
   df_params = df_params,
-  loglike = cpp11_ll,
+  loglike = "cpp11_ll",
   logprior = lp,
   burnin = 5000L,
   samples = 5000L
@@ -98,7 +98,7 @@ bm <- microbenchmark::microbenchmark(
   new_c = run_dj11(
     data = data_list,
     df_params = df_params,
-    loglike = cpp11_ll,
+    loglike = "cpp11_ll",
     logprior = lp,
     burnin = 5000L,
     samples = 5000L
