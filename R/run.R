@@ -1,6 +1,8 @@
 run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples, target_acceptance = 0.44, misc = list(),
                      n_rungs = 1L, swap = TRUE, chains = 1, cluster = NULL){
 
+  # Save inputs
+  # TODO: these will need to be chain-specific with different starting vals
   input <- list()
   input$theta_init <- unlist(df_params$init)
   input$theta_names <- unlist(df_params$name)

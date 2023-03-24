@@ -28,7 +28,7 @@ o1r <- run_dj11(
   logprior = lp,
   burnin = 5000L,
   samples = 5000L,
-  chains = 2
+  chains = 1
 )
 head(o1r$output)
 class(o1r) <- 'drjacoby_output'
