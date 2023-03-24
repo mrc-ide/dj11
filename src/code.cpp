@@ -226,18 +226,26 @@ list mcmc(
       }
     }
 
-    // Rung swaps
-    for(int r = 0; r < (n_rungs - 1); ++r){
-      rung_beta = beta[r];
-      mh = rung_beta * (ll[r + 1] - ll[r]) + (lp[r + 1] - lp[r]);
+    // loop over rungs, starting with the hottest chain and moving to the cold
+    // chain. Each time propose a swap with the next rung up
+    for(int r = (n_rungs - 1); r >0; --r){
+      double rung_beta1 = beta[r];
+      double rung_beta2 = beta[r - 1];
+      double loglike1 = ll[r];
+      double loglike2 = ll[r - 1];
+
+      double acceptance = (loglike2*rung_beta1 + loglike1*rung_beta2) - (loglike1*rung_beta1 + loglike2*rung_beta2);
       // accept or reject move
-      mh_accept = log(Rf_runif(0, 1)) < mh;
-      if(mh_accept){
-        swap_acceptance[r] += 1;
+      bool accept_move = log(Rf_runif(0, 1)) < acceptance;
+
+      if(accept_move){
         int ri1 = rung_index[r];
-        int ri2 = rung_index[r + 1];
+        int ri2 = rung_index[r - 1];
+        swap_acceptance[r - 1] += 1;
         rung_index[r] = ri2;
-        rung_index[r + 1] = ri1;
+        rung_index[r - 1] = ri1;
+        ll[r] = loglike2;
+        ll[r - 1] = loglike1;
       }
     }
   }
