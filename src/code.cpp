@@ -41,10 +41,10 @@ list mcmc(
   misc.push_back({"block"_nm = 0});
 
   // Initialise matrix for theta
-  double theta[n_par][n_rungs];
-  for(int i = 0; i < n_par; ++i){
-    for(int j = 0; j < n_rungs; ++j){
-      theta[i][j] = theta_init[i];
+  double theta[n_rungs][n_par];
+  for(int i = 0; i < n_rungs; ++i){
+    for(int j = 0; j < n_par; ++j){
+      theta[i][j] = theta_init[j];
     }
   }
   // Initialise vector for proposal theta
@@ -57,21 +57,21 @@ list mcmc(
   theta_prop.names() = theta_names;
 
   // Initialise value for transformed theta: phi
-  double phi[n_par][n_rungs];
-  for(int i = 0; i < n_par; ++i){
-    for(int j = 0; j < n_rungs; ++j){
-      phi[i][j] = theta_to_phi(theta[i][0], transform_type[i], theta_min[i], theta_max[i]);
+  double phi[n_rungs][n_par];
+  for(int i = 0; i < n_rungs; ++i){
+    for(int j = 0; j < n_par; ++j){
+      phi[i][j] = theta_to_phi(theta[i][j], transform_type[j], theta_min[j], theta_max[j]);
     }
   }
   // Initialise vector for proposal phi
   std::vector<double> phi_prop(n_par);
 
   // Initialise vector to store blocked log likelihood
-  double block_ll[n_unique_blocks][n_rungs];
-  for(int i = 0; i < n_rungs; ++i){
+  double block_ll[n_rungs][n_unique_blocks];
     for(int b = 0; b < n_unique_blocks; ++b) {
+      for(int i = 0; i < n_rungs; ++i){
       misc["block"] = as_sexp(b + 1);
-      block_ll[b][i] = ll_f(theta_prop, data, misc);
+      block_ll[i][b] = ll_f(theta_prop, data, misc);
     }
   }
 
@@ -82,7 +82,7 @@ list mcmc(
   for(int r = 0; r < n_rungs; ++r){
     double sum_ll = 0;
     for(int b = 0; b < n_unique_blocks; ++b){
-      sum_ll += block_ll[b][r];
+      sum_ll += block_ll[r][b];
     }
     ll[r] = sum_ll;
   }
@@ -107,7 +107,7 @@ list mcmc(
   // Initialise output matrix
   writable::doubles_matrix<> out_theta(iterations, n_par);
   for(int p = 0; p < n_par; ++p){
-    out_theta(0, p) =  theta[p][0];
+    out_theta(0, p) =  theta[0][p];
   }
   //////////////////////////////////////////////////////////////////////////////
 
@@ -162,21 +162,21 @@ list mcmc(
 
       // Copy rung theta and phi
       for(int p = 0; p < n_par; ++p){
-        theta_prop[p] = theta[p][index];
-        phi_prop[p] = phi[p][index];
+        theta_prop[p] = theta[index][p];
+        phi_prop[p] = phi[index][p];
       }
 
       lp_prop = lp[r];
 
       for(int p = 0; p < n_par; ++p){
         // Propose new value of phi
-        phi_prop[p] = Rf_rnorm(phi[p][index], proposal_sd[p][r]);
+        phi_prop[p] = Rf_rnorm(phi[index][p], proposal_sd[p][r]);
         // Transform new phi_prop -> theta_prop
         theta_prop[p] = phi_to_theta(phi_prop[p], transform_type[p], theta_min[p], theta_max[p]);
 
         // Copy blocked log-likelihood
         for(int b = 0; b < n_unique_blocks; ++b){
-          block_ll_prop[b] = block_ll[b][index];
+          block_ll_prop[b] = block_ll[index][b];
         }
         // For any block this parameter is associated with, update blocked log-likelihood
         writable::integers blocks(blocks_list[p]);
@@ -189,19 +189,19 @@ list mcmc(
         lp_prop = lp_f(theta_prop);
 
         // get parameter transformation adjustment
-        adjustment = get_adjustment(theta[p][index], theta_prop[p], transform_type[p], theta_min[p], theta_max[p]);
+        adjustment = get_adjustment(theta[index][p], theta_prop[p], transform_type[p], theta_min[p], theta_max[p]);
         // calculate Metropolis-Hastings ratio
         mh = rung_beta * (sum(block_ll_prop) - ll[r]) + (lp_prop - lp[r]) + adjustment;
         // accept or reject move
         mh_accept = log(Rf_runif(0, 1)) < mh;
         if(mh_accept){
           // Update theta
-          theta[p][index] = theta_prop[p];
+          theta[index][p] = theta_prop[p];
           // Update phi
-          phi[p][index] = phi_prop[p];
+          phi[index][p] = phi_prop[p];
           // Update blocked log likelihood
           for(int b = 0; b < n_unique_blocks; ++b){
-            block_ll[b][index] = block_ll_prop[b];
+            block_ll[index][b] = block_ll_prop[b];
           }
           // Update log likelihood
           ll[r] = sum(block_ll_prop);
@@ -213,9 +213,9 @@ list mcmc(
           acceptance[p][r] = acceptance[p][r] + 1;
         } else {
           // Revert theta prop
-          theta_prop[p] =  theta[p][index];
+          theta_prop[p] =  theta[index][p];
           // Revert phi prop
-          phi_prop[p] = phi[p][index];
+          phi_prop[p] = phi[index][p];
           // Robbins monroe step
           if(i <= burnin){
             proposal_sd[p][r] = exp(log(proposal_sd[p][r]) - target_acceptance / sqrt(i));
@@ -229,7 +229,7 @@ list mcmc(
         out_log_prior[i] = lp[r];
         // Record parameters
         for(int p = 0; p < n_par; ++p){
-          out_theta(i, p) =  theta[p][index];
+          out_theta(i, p) =  theta[index][p];
         }
       }
     }

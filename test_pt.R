@@ -50,7 +50,7 @@ pt2 <- run_dj11(
 pt2$rung_index
 sort(pt2$rung_index)
 pt2$swap_acceptance / (1e3 + 1e4)
-plot(pt2$out[,1:2], xlab = "alpha", ylab = "beta")
+plot(pt2$out[5000:10000,1:2], xlab = "alpha", ylab = "beta")
 
 mb <- microbenchmark::microbenchmark(
   new_1rung = run_dj11(
@@ -88,15 +88,6 @@ mb <- microbenchmark::microbenchmark(
     burnin = 1000L,
     samples = 10000L,
     n_rungs = 8L
-  ),
-  new_30rung = run_dj11(
-    data = data_list,
-    df_params = df_params,
-    loglike = ll,
-    logprior = lp,
-    burnin = 1000L,
-    samples = 10000L,
-    n_rungs = 30L
   ),
   old_1rung = drjacoby::run_mcmc(
     data = data_list,
@@ -141,17 +132,6 @@ mb <- microbenchmark::microbenchmark(
     chains = 1,
     silent = TRUE,
     rungs = 8
-  ),
-  old_30rung = drjacoby::run_mcmc(
-    data = data_list,
-    df_params = df_params,
-    loglike = ll,
-    logprior = lp,
-    burnin = 1000L,
-    samples = 10000L,
-    chains = 1,
-    silent = TRUE,
-    rungs = 30
   ),
   times = 5
 )
