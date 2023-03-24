@@ -16,7 +16,7 @@ list mcmc(
     integers transform_type,
     doubles theta_min,
     doubles theta_max,
-    integers blocks,
+    list blocks_list,
     int n_unique_blocks,
     list data,
     int burnin,
@@ -26,7 +26,8 @@ list mcmc(
     double target_acceptance,
     writable::list misc,
     int n_rungs,
-    doubles beta_init) {
+    doubles beta_init,
+    bool swap) {
 
 
   int iterations = burnin + samples;
@@ -67,10 +68,10 @@ list mcmc(
 
   // Initialise vector to store blocked log likelihood
   double block_ll[n_unique_blocks][n_rungs];
-  for(int i = 0; i < n_unique_blocks; ++i){
-    misc["block"] = as_sexp(i);
-    for(int j = 0; j < n_rungs; ++j){
-      block_ll[i][j] = ll_f(theta_prop, data, misc);
+  for(int i = 0; i < n_rungs; ++i){
+    for(int b = 0; b < n_unique_blocks; ++b) {
+      misc["block"] = as_sexp(b + 1);
+      block_ll[b][i] = ll_f(theta_prop, data, misc);
     }
   }
 
@@ -164,20 +165,27 @@ list mcmc(
         theta_prop[p] = theta[p][index];
         phi_prop[p] = phi[p][index];
       }
-      for(int b = 0; b < n_unique_blocks; ++b){
-        // TODO I think block_ll also needs to be indexed like theta
-        block_ll_prop[b] = block_ll[b][index];
-      }
+
       lp_prop = lp[r];
 
       for(int p = 0; p < n_par; ++p){
-        // Set block for parameter
-        block = blocks[p] - 1;
-        misc["block"] = as_sexp(block);
-        // Propose new value
+        // Propose new value of phi
         phi_prop[p] = Rf_rnorm(phi[p][index], proposal_sd[p][r]);
+        // Transform new phi_prop -> theta_prop
         theta_prop[p] = phi_to_theta(phi_prop[p], transform_type[p], theta_min[p], theta_max[p]);
-        block_ll_prop[block] = ll_f(theta_prop, data, misc);
+
+        // Copy blocked log-likelihood
+        for(int b = 0; b < n_unique_blocks; ++b){
+          block_ll_prop[b] = block_ll[b][index];
+        }
+        // For any block this parameter is associated with, update blocked log-likelihood
+        writable::integers blocks(blocks_list[p]);
+        for(int b = 0; b < blocks.size(); ++b) {
+          int block = blocks[b];
+          misc["block"] = as_sexp(block);
+          block_ll_prop[block - 1] = ll_f(theta_prop, data, misc);
+        }
+        // Update proposal prior
         lp_prop = lp_f(theta_prop);
 
         // get parameter transformation adjustment
@@ -187,33 +195,33 @@ list mcmc(
         // accept or reject move
         mh_accept = log(Rf_runif(0, 1)) < mh;
         if(mh_accept){
+          // Update theta
+          theta[p][index] = theta_prop[p];
+          // Update phi
+          phi[p][index] = phi_prop[p];
+          // Update blocked log likelihood
+          for(int b = 0; b < n_unique_blocks; ++b){
+            block_ll[b][index] = block_ll_prop[b];
+          }
+          // Update log likelihood
+          ll[r] = sum(block_ll_prop);
+          lp[r] = lp_prop;
           // Robbins monroe step
           if(i <= burnin){
             proposal_sd[p][r] = exp(log(proposal_sd[p][r]) + (1 - target_acceptance) / sqrt(i));
           }
           acceptance[p][r] = acceptance[p][r] + 1;
         } else {
+          // Revert theta prop
           theta_prop[p] =  theta[p][index];
+          // Revert phi prop
           phi_prop[p] = phi[p][index];
-          block_ll_prop[block] = block_ll[block][index];
-          lp_prop = lp[r];
           // Robbins monroe step
           if(i <= burnin){
             proposal_sd[p][r] = exp(log(proposal_sd[p][r]) - target_acceptance / sqrt(i));
           }
         }
       }
-
-      for(int p = 0; p < n_par; ++p){
-        theta[p][index] = theta_prop[p];
-        phi[p][index] = phi_prop[p];
-      }
-      for(int b = 0; b < n_unique_blocks; ++b){
-        block_ll[b][index] = block_ll_prop[b];
-      }
-      lp[r] = lp_prop;
-      ll[r] = sum(block_ll_prop);
-
       // Only store values for the cold chain
       if(r == 0){
         // Record log likelihood
@@ -228,26 +236,36 @@ list mcmc(
 
     // loop over rungs, starting with the hottest chain and moving to the cold
     // chain. Each time propose a swap with the next rung up
-    for(int r = (n_rungs - 1); r >0; --r){
-      double rung_beta1 = beta[r];
-      double rung_beta2 = beta[r - 1];
-      double loglike1 = ll[r];
-      double loglike2 = ll[r - 1];
+    if(swap){
+      for(int r = (n_rungs - 1); r >0; --r){
+        double rung_beta1 = beta[r];
+        double rung_beta2 = beta[r - 1];
+        double loglike1 = ll[r];
+        double loglike2 = ll[r - 1];
 
-      double acceptance = (loglike2*rung_beta1 + loglike1*rung_beta2) - (loglike1*rung_beta1 + loglike2*rung_beta2);
-      // accept or reject move
-      bool accept_move = log(Rf_runif(0, 1)) < acceptance;
+        double acceptance = (loglike2*rung_beta1 + loglike1*rung_beta2) - (loglike1*rung_beta1 + loglike2*rung_beta2);
+        // accept or reject move
+        bool accept_move = log(Rf_runif(0, 1)) < acceptance;
 
-      if(accept_move){
-        int ri1 = rung_index[r];
-        int ri2 = rung_index[r - 1];
-        swap_acceptance[r - 1] += 1;
-        rung_index[r] = ri2;
-        rung_index[r - 1] = ri1;
-        ll[r] = loglike2;
-        ll[r - 1] = loglike1;
+        if(accept_move){
+          int ri1 = rung_index[r];
+          int ri2 = rung_index[r - 1];
+          swap_acceptance[r - 1] += 1;
+          rung_index[r] = ri2;
+          rung_index[r - 1] = ri1;
+          ll[r] = loglike2;
+          ll[r - 1] = loglike1;
+        }
       }
     }
+  }
+
+  // Extract the cold chain proposal sd and acceptance rates for output
+  std::vector<double> proposal_sd_out(n_par);
+  std::vector<double> acceptance_out(n_par);
+  for(int i = 0; i < n_par; ++i){
+    proposal_sd_out[i] = proposal_sd[i][0];
+    acceptance_out[i] = acceptance[i][0];
   }
 
   // Return outputs in a list
@@ -255,9 +273,9 @@ list mcmc(
     "log_likelihood"_nm = out_log_likelihood,
       "log_prior"_nm = out_log_prior,
       "out"_nm = out_theta,
-      "proposal_sd"_nm = proposal_sd[0][0],
-                                       "acceptance"_nm = acceptance[0][0],
-                                                                      "rung_index"_nm = rung_index,
-                                                                      "swap_acceptance"_nm = swap_acceptance
+      "proposal_sd"_nm = proposal_sd_out,
+      "acceptance"_nm = acceptance_out,
+      "rung_index"_nm = rung_index,
+      "swap_acceptance"_nm = swap_acceptance
   });
 }

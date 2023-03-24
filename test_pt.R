@@ -16,7 +16,7 @@ df_params <- drjacoby::define_params(
 
 # Likelihood and prior
 ll <- function(params, data, block){
-  mean = params["alpha"] * params["alpha"] * params["beta"] + params["epsilon"];
+  mean = params["alpha"] * params["alpha"] * params["beta"] + params["epsilon"]
   # calculate log-probability of data
   sum(dnorm(data$x, mean = mean, sd = 1, log = TRUE))
 }
@@ -30,22 +30,22 @@ pt1 <- run_dj11(
   df_params = df_params,
   loglike = ll,
   logprior = lp,
-  burnin = 10000L,
+  burnin = 1000L,
   samples = 10000L,
-  n_rungs = 1
+  n_rungs = 1L
 )
 
 par(mfrow = c(1, 3))
-plot(pt1$out[15000:20000,1:2], xlab = "alpha", ylab = "beta")
+plot(pt1$out[1e3:(1e3 + 1e4), 1:2], xlab = "alpha", ylab = "beta")
 
 pt2 <- run_dj11(
   data = data_list,
   df_params = df_params,
   loglike = ll,
   logprior = lp,
-  burnin = 1e3,
-  samples = 1e4,
-  n_rungs = 20
+  burnin = 1000L,
+  samples = 10000L,
+  n_rungs = 20L
 )
 pt2$rung_index
 sort(pt2$rung_index)
@@ -58,17 +58,17 @@ mb <- microbenchmark::microbenchmark(
     df_params = df_params,
     loglike = ll,
     logprior = lp,
-    burnin = 1e3,
-    samples = 1e4,
-    n_rungs = 20
+    burnin = 1000L,
+    samples = 10000L,
+    n_rungs = 20L
   ),
   old = drjacoby::run_mcmc(
     data = data_list,
     df_params = df_params,
     loglike = ll,
     logprior = lp,
-    burnin = 1e3,
-    samples = 1e4,
+    burnin = 1000L,
+    samples = 10000L,
     chains = 1,
     silent = TRUE,
     rungs = 20
@@ -76,3 +76,69 @@ mb <- microbenchmark::microbenchmark(
   times = 10
 )
 plot(mb)
+
+
+
+
+
+mb1 <- microbenchmark::microbenchmark(
+  # Example run
+  pt1 <- run_dj11(
+    data = data_list,
+    df_params = df_params,
+    loglike = ll,
+    logprior = lp,
+    burnin = 10000L,
+    samples = 10000L,
+    n_rungs = 1
+  ),
+  times = 1
+)
+
+mb2 <- microbenchmark::microbenchmark(
+  # Example run
+  pt1 <- run_dj11(
+    data = data_list,
+    df_params = df_params,
+    loglike = ll,
+    logprior = lp,
+    burnin = 10000L,
+    samples = 10000L,
+    n_rungs = 1,
+    swap = FALSE
+  ),
+  times = 1
+)
+
+mb3 <- microbenchmark::microbenchmark(
+  # Example run
+  pt1 <- run_dj11(
+    data = data_list,
+    df_params = df_params,
+    loglike = ll,
+    logprior = lp,
+    burnin = 10000L,
+    samples = 10000L,
+    n_rungs = 10,
+    swap = TRUE
+  ),
+  times = 1
+)
+
+mb4 <- microbenchmark::microbenchmark(
+  # Example run
+  pt1 <- run_dj11(
+    data = data_list,
+    df_params = df_params,
+    loglike = ll,
+    logprior = lp,
+    burnin = 10000L,
+    samples = 10000L,
+    n_rungs = 10,
+    swap = FALSE
+  ),
+  times = 1
+)
+
+dplyr::bind_rows(list(mb1, mb2, mb3, mb4))
+
