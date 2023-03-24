@@ -1,5 +1,5 @@
 run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples, target_acceptance = 0.44, misc = list(),
-                     n_rungs = 1L, swap = TRUE, chains = 1){
+                     n_rungs = 1L, swap = TRUE, chains = 1, cluster = NULL){
 
   theta_init <- unlist(df_params$init)
   theta_names <- unlist(df_params$name)
@@ -15,26 +15,49 @@ run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples, target
   stopifnot(is.integer(n_unique_blocks))
   stopifnot(is.integer(n_rungs))
 
-  out <- mcmc(theta_init, theta_names, theta_transform_type,  theta_min,  theta_max,
-       blocks_list, n_unique_blocks, data, burnin, samples, loglike, logprior,
-       target_acceptance, misc, n_rungs, beta_init, swap)
-  out$output <- cbind(
-    data.frame(chain = 1, phase = rep(c("burnin", "sampling"), c(burnin, samples))),
-    out$output
-    )
-  names(out$output) <- c("chain", "phase", "iteration", theta_names, "logprior", "loglikelihood")
+  if(is.null(cluster)){
+    mcmc_runs <- lapply(1:chains, function(x){
+      mcmc_out <- mcmc(theta_init, theta_names, theta_transform_type,  theta_min,  theta_max,
+                       blocks_list, n_unique_blocks, data, burnin, samples, loglike, logprior,
+                       target_acceptance, misc, n_rungs, beta_init, swap)
+      mcmc_out$output <- cbind(
+        data.frame(chain = x, phase = rep(c("burnin", "sampling"), c(burnin, samples))),
+        mcmc_out$output
+      )
+      names(mcmc_out$output) <- c("chain", "phase", "iteration", theta_names, "logprior", "loglikelihood")
+      return(mcmc_out)
+    })
+  }
 
+  out <- list()
+  out$output <- dplyr::bind_rows(sapply(mcmc_runs, '[', 'output'))
   # Diagnostics
   # DIC
   deviance <- -2 * out$output[out$output$phase == "sampling", "loglikelihood"]
   dic  <- mean(deviance) + 0.5 * var(deviance)
   out$diagnostics$DIC_Gelman <- dic
-  # MC acceptance
-  out$diagnostics$mc_accept <- out$swap_acceptance / (burnin + samples)
+  if(n_rungs > 1){
+    # MC acceptance
+    out$diagnostics$mc_accept <- dplyr::bind_rows(sapply(mcmc_runs, '[', 'swap_acceptance'))
+    # Rung index
+    out$diagnostics$rung_index <- dplyr::bind_rows(sapply(mcmc_runs, '[', 'rung_index'))
+  } else {
+    out$diagnostics$mc_accept <- NULL
+    out$diagnostics$rung_index <- NULL
+  }
   # ESS
   out$diagnostics$ess <- apply(out$output[out$output$phase == "sampling", theta_names], 2, coda::effectiveSize)
-  # Rung index
-  out$diagnostics$rung_index <- out$rung_index
+  # Rhat (Gelman-Rubin diagnostic)
+  if (chains > 1) {
+    rhat_est <- c()
+    for (p in seq_along(theta_names)) {
+      rhat_est[p] <- out$output[out$output$phase == "sampling", c("chain", theta_names[p])] |>
+        drjacoby:::gelman_rubin(chains = chains, samples = samples)
+    }
+    names(rhat_est) <- theta_names
+    out$diagnostics$rhat <- rhat_est
+  }
+
 
   # Parameters
   out$parameters <- list()

@@ -27,9 +27,12 @@ o1r <- run_dj11(
   loglike = ll,
   logprior = lp,
   burnin = 5000L,
-  samples = 5000L
+  samples = 5000L,
+  chains = 2
 )
 head(o1r$output)
+class(o1r) <- 'drjacoby_output'
+drjacoby::plot_par(o1r, "sigma")
 
 o1r$rung_index
 o1r$swap_acceptance / 10000
