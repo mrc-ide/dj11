@@ -29,13 +29,13 @@ o1r <- run_dj11(
   burnin = 5000L,
   samples = 5000L
 )
-head(o1r$out)
+head(o1r$output)
 
 o1r$rung_index
 o1r$swap_acceptance / 10000
 
-plot(o1r$out$mu, t= "l")
-plot(o1r$out$sigma, t=  "l")
+plot(o1r$output$mu, t= "l")
+plot(o1r$output$sigma, t=  "l")
 
 # Load c++ log likelihoods
 cpp11::cpp_source("test_cpp11_ll.cpp")
@@ -73,12 +73,12 @@ o2c <- drjacoby::run_mcmc(
 )
 
 par(mfrow = c(1, 3))
-plot(density(o1r$out$mu), ylim = c(0, 5), main = "mu")
+plot(density(o1r$output$mu), ylim = c(0, 5), main = "mu")
 lines(density(o2r$output$mu), col = "red")
 lines(density(o1c$ou$mu), col = "blue")
 lines(density(o2c$output$mu), col = "orange")
 
-plot(density(o1r$out$sigma), main = "sigma")
+plot(density(o1r$output$sigma), main = "sigma")
 lines(density(o2r$output$sigma), col = "red")
 lines(density(o1c$ou$sigma), col = "blue")
 lines(density(o2c$output$sigma), col = "orange")

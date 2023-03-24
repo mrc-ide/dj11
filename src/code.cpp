@@ -266,7 +266,7 @@ list mcmc(
 
   // Return outputs in a list
   return writable::list({
-      "out"_nm = out,
+      "output"_nm = out,
       "proposal_sd"_nm = proposal_sd_out,
       "acceptance"_nm = acceptance_out,
       "rung_index"_nm = rung_index,
