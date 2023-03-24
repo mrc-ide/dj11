@@ -53,16 +53,52 @@ pt2$swap_acceptance / (1e3 + 1e4)
 plot(pt2$out[,1:2], xlab = "alpha", ylab = "beta")
 
 mb <- microbenchmark::microbenchmark(
-  new = run_dj11(
+  new_1rung = run_dj11(
     data = data_list,
     df_params = df_params,
     loglike = ll,
     logprior = lp,
     burnin = 1000L,
     samples = 10000L,
-    n_rungs = 20L
+    n_rungs = 1L
   ),
-  old = drjacoby::run_mcmc(
+  new_2rung = run_dj11(
+    data = data_list,
+    df_params = df_params,
+    loglike = ll,
+    logprior = lp,
+    burnin = 1000L,
+    samples = 10000L,
+    n_rungs = 2L
+  ),
+  new_4rung = run_dj11(
+    data = data_list,
+    df_params = df_params,
+    loglike = ll,
+    logprior = lp,
+    burnin = 1000L,
+    samples = 10000L,
+    n_rungs = 4L
+  ),
+  new_8rung = run_dj11(
+    data = data_list,
+    df_params = df_params,
+    loglike = ll,
+    logprior = lp,
+    burnin = 1000L,
+    samples = 10000L,
+    n_rungs = 8L
+  ),
+  new_30rung = run_dj11(
+    data = data_list,
+    df_params = df_params,
+    loglike = ll,
+    logprior = lp,
+    burnin = 1000L,
+    samples = 10000L,
+    n_rungs = 30L
+  ),
+  old_1rung = drjacoby::run_mcmc(
     data = data_list,
     df_params = df_params,
     loglike = ll,
@@ -71,74 +107,52 @@ mb <- microbenchmark::microbenchmark(
     samples = 10000L,
     chains = 1,
     silent = TRUE,
-    rungs = 20
+    rungs = 1
   ),
-  times = 10
-)
-plot(mb)
-
-
-
-
-
-mb1 <- microbenchmark::microbenchmark(
-  # Example run
-  pt1 <- run_dj11(
+  old_2rung = drjacoby::run_mcmc(
     data = data_list,
     df_params = df_params,
     loglike = ll,
     logprior = lp,
-    burnin = 10000L,
+    burnin = 1000L,
     samples = 10000L,
-    n_rungs = 1
+    chains = 1,
+    silent = TRUE,
+    rungs = 2
   ),
-  times = 1
-)
-
-mb2 <- microbenchmark::microbenchmark(
-  # Example run
-  pt1 <- run_dj11(
+  old_4rung = drjacoby::run_mcmc(
     data = data_list,
     df_params = df_params,
     loglike = ll,
     logprior = lp,
-    burnin = 10000L,
+    burnin = 1000L,
     samples = 10000L,
-    n_rungs = 1,
-    swap = FALSE
+    chains = 1,
+    silent = TRUE,
+    rungs = 4
   ),
-  times = 1
-)
-
-mb3 <- microbenchmark::microbenchmark(
-  # Example run
-  pt1 <- run_dj11(
+  old_8rung = drjacoby::run_mcmc(
     data = data_list,
     df_params = df_params,
     loglike = ll,
     logprior = lp,
-    burnin = 10000L,
+    burnin = 1000L,
     samples = 10000L,
-    n_rungs = 10,
-    swap = TRUE
+    chains = 1,
+    silent = TRUE,
+    rungs = 8
   ),
-  times = 1
-)
-
-mb4 <- microbenchmark::microbenchmark(
-  # Example run
-  pt1 <- run_dj11(
+  old_30rung = drjacoby::run_mcmc(
     data = data_list,
     df_params = df_params,
     loglike = ll,
     logprior = lp,
-    burnin = 10000L,
+    burnin = 1000L,
     samples = 10000L,
-    n_rungs = 10,
-    swap = FALSE
+    chains = 1,
+    silent = TRUE,
+    rungs = 30
   ),
-  times = 1
+  times = 5
 )
-
-dplyr::bind_rows(list(mb1, mb2, mb3, mb4))
-
+plot(mb, log = "y")

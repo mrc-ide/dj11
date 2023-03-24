@@ -27,8 +27,7 @@ o1r <- run_dj11(
   loglike = ll,
   logprior = lp,
   burnin = 5000L,
-  samples = 5000L,
-  n_rungs = 1
+  samples = 5000L
 )
 
 o1r$rung_index
