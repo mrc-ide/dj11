@@ -8,8 +8,8 @@ data <- rnorm(100, true_theta[1], true_theta[2])
 
 # Create DrJacoby style inputs
 data_list <- list(x = data)
-df_params <- drjacoby::define_params(name = "mu", min = -Inf, max = Inf, init = 0.1, block = 1,
-                                     name = "sigma", min = 0, max = Inf, init = 1, block = 1)
+df_params <- drjacoby::define_params(name = "mu", min = -Inf, max = Inf, init = c(0.2, 0.1), block = 1,
+                                     name = "sigma", min = 0, max = Inf, init = c(2, 1), block = 1)
 
 # Likelihood and prior
 ll <- function(params, data, block){
@@ -28,7 +28,7 @@ o1r <- run_dj11(
   logprior = lp,
   burnin = 5000L,
   samples = 5000L,
-  chains = 1
+  chains = 2
 )
 head(o1r$output)
 class(o1r) <- 'drjacoby_output'

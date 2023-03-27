@@ -1,71 +1,99 @@
 run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples, target_acceptance = 0.44, misc = list(),
                      n_rungs = 1L, swap = TRUE, chains = 1, cluster = NULL){
 
-  # Save inputs
-  # TODO: these will need to be chain-specific with different starting vals
-  input <- list()
-  input$theta_init <- unlist(df_params$init)
-  input$theta_names <- unlist(df_params$name)
-  input$theta_min <-  unlist(df_params$min)
-  input$theta_max <-  unlist(df_params$max)
-  input$theta_transform_type <- get_transform_type(input$theta_min, input$theta_max)
-  input$blocks_list <- lapply(df_params$block, as.integer)
-  input$n_unique_blocks <- length(unique(unlist(input$blocks_list)))
-  input$data <- data
-  input$burnin <- burnin
-  input$samples <- samples
-  input$loglike <- loglike
-  input$logprior <- logprior
-  input$target_acceptance <- target_acceptance
-  input$misc <- misc
-  input$n_rungs <- n_rungs
-  input$beta_init <- seq(1, 0, length.out = input$n_rungs)
-  input$swap <- swap
-  input$chains <- chains
+  ### Inputs ###################################################################
+  # Input checks
+  stopifnot(is.integer(burnin))
+  stopifnot(is.integer(samples))
+  stopifnot(is.integer(n_rungs))
 
-  stopifnot(is.integer(input$burnin))
-  stopifnot(is.integer(input$samples))
-  stopifnot(is.integer(input$n_unique_blocks))
-  stopifnot(is.integer(input$n_rungs))
+  # List inputs - to distribute if running in parallel
+  input <- lapply(1:chains, function(x){
+    input <- list()
+    input$chain = x
+    input$theta_init <- sapply(df_params$init, '[', x)
+    input$theta_names <- unlist(df_params$name)
+    input$theta_min <-  unlist(df_params$min)
+    input$theta_max <-  unlist(df_params$max)
+    input$theta_transform_type <- get_transform_type(input$theta_min, input$theta_max)
+    input$blocks_list <- lapply(df_params$block, as.integer)
+    input$n_unique_blocks <- length(unique(unlist(input$blocks_list)))
+    input$data <- data
+    input$burnin <- burnin
+    input$samples <- samples
+    input$loglike <- loglike
+    input$logprior <- logprior
+    input$target_acceptance <- target_acceptance
+    input$misc <- misc
+    input$n_rungs <- n_rungs
+    input$beta_init <- seq(1, 0, length.out = input$n_rungs)
+    input$swap <- swap
+    input$chains <- chains
+    return(input)
+  })
+  ##############################################################################
 
+  ### Run MCMC #################################################################
   if(is.null(cluster)){
-    mcmc_runs <- lapply(1:chains, run_internal, input = input)
+    mcmc_runs <- lapply(
+      X = input,
+      FUN = run_internal
+    )
   } else {
-    parallel::clusterEvalQ(cluster, library(dj11))
-    mcmc_runs <- parallel::clusterApplyLB(cl = cluster, 1:chains, run_internal, input = input)
+    parallel::clusterEvalQ(
+      cl = cluster,
+      expr = library(dj11)
+    )
+    mcmc_runs <- parallel::clusterApplyLB(
+      cl = cluster,
+      x = input,
+      fun = run_internal
+    )
   }
+  ##############################################################################
 
+  ### MCMC output ##############################################################
   out <- list()
   out$output <- dplyr::bind_rows(sapply(mcmc_runs, '[', 'output'))
-  # Diagnostics
+  ##############################################################################
+
+  ### Diagnostics ##############################################################
   # DIC
-  deviance <- -2 * out$output[out$output$phase == "sampling", "loglikelihood"]
-  dic  <- mean(deviance) + 0.5 * var(deviance)
-  out$diagnostics$DIC_Gelman <- dic
+  out$diagnostics$DIC_Gelman <- dic(out$output)
+
+  # MC
+  out$diagnostics$mc_accept <- NULL
+  out$diagnostics$rung_index <- NULL
   if(n_rungs > 1){
     # MC acceptance
-    out$diagnostics$mc_accept <- dplyr::bind_rows(sapply(mcmc_runs, '[', 'swap_acceptance'))
+    out$diagnostics$mc_accept <- dplyr::bind_rows(
+      sapply(mcmc_runs, '[', 'swap_acceptance')
+    )
     # Rung index
-    out$diagnostics$rung_index <- dplyr::bind_rows(sapply(mcmc_runs, '[', 'rung_index'))
-  } else {
-    out$diagnostics$mc_accept <- NULL
-    out$diagnostics$rung_index <- NULL
+    out$diagnostics$rung_index <- dplyr::bind_rows(
+      sapply(mcmc_runs, '[', 'rung_index')
+    )
   }
+
   # ESS
-  out$diagnostics$ess <- apply(out$output[out$output$phase == "sampling", input$theta_names], 2, coda::effectiveSize)
+  out$diagnostics$ess <- ess(
+    output = out$output,
+    parameter_names = input$theta_names
+  )
+
   # Rhat (Gelman-Rubin diagnostic)
-  if (chains > 1) {
-    rhat_est <- c()
-    for (p in seq_along(input$theta_names)) {
-      rhat_est[p] <- out$output[out$output$phase == "sampling", c("chain", input$theta_names[p])] |>
-        drjacoby:::gelman_rubin(chains = chains, samples = samples)
-    }
-    names(rhat_est) <- input$theta_names
-    out$diagnostics$rhat <- rhat_est
+  out$diagnostics$rhat <- NA
+  if(chains > 1){
+    out$diagnostics$rhat <- rhat(
+      output = out$output,
+      parameter_names = input$theta_names,
+      n_chains = chains,
+      samples= samples
+    )
   }
+  ##############################################################################
 
-
-  # Parameters
+  ### Parameters ###############################################################
   out$parameters <- input[c("data",
                             "df_params",
                             "loglike",
@@ -75,27 +103,32 @@ run_dj11 <- function(data, df_params, loglike, logprior, burnin, samples, target
                             "n_rungs",
                             "chains",
                             "swap")]
+  ##############################################################################
 
   out <- out[c("output", "diagnostics", "parameters")]
-
   return(out)
 }
 
-run_internal <- function(x, input){
+run_internal <- function(input){
+  # Convert cpp11 loglikelihood
   if(is.character(input$loglike)){
     input$loglike <- get(input$loglike)
   }
-  if(is.character(input$loglike)){
-    input$loglike <- get(input$logprior)
+  # Convert cpp11 logprior
+  if(is.character(input$logprior)){
+    input$logprior <- get(input$logprior)
   }
+  # Run mcmc
   mcmc_out <- mcmc(input$theta_init, input$theta_names, input$theta_transform_type,  input$theta_min,  input$theta_max,
                    input$blocks_list, input$n_unique_blocks, input$data, input$burnin, input$samples, input$loglike, input$logprior,
                    input$target_acceptance, input$misc, input$n_rungs, input$beta_init, input$swap)
+  # Add Chain, burnin, sampling columns
   mcmc_out$output <- cbind(
-    data.frame(chain = x, phase = rep(c("burnin", "sampling"), c(input$burnin, input$samples))),
+    data.frame(chain = input$chain, phase = rep(c("burnin", "sampling"), c(input$burnin, input$samples))),
     mcmc_out$output
   )
   names(mcmc_out$output) <- c("chain", "phase", "iteration", input$theta_names, "logprior", "loglikelihood")
+
   return(mcmc_out)
 }
 

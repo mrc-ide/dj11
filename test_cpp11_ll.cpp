@@ -23,3 +23,4 @@ double cpp11_ll(doubles params, list data, list misc){
   // return as SEXP
   return(ret);
 }
+
